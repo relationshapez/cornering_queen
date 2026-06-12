@@ -1,0 +1,721 @@
+<!--
+  Copyright (c) 2026 Alan Miller
+  Released under the MIT License
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relationshapez: Cornering Queen</title>
+  <style>
+    :root {
+      --gw-blue: #033C5A;
+      --gw-buff: #D6BF91;
+      --dark-buff: #AA9868;
+      --light-buff: #F2E8D2;
+      --paper: #FFFDF8;
+      --danger: #B3261E;
+      --move-fill: #D6BF91;
+      --safe-fill: rgba(3, 60, 90, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      color: var(--gw-blue);
+      background: var(--paper);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(100%, 760px);
+      margin: 0 auto;
+      padding: 12px;
+    }
+
+    .topbar,
+    .gamebar,
+    .settings-grid,
+    .status-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .topbar {
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .tab-switch {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: min(72vw, 230px);
+      min-height: 42px;
+      padding: 3px;
+      border: 2px solid var(--gw-blue);
+      border-radius: 999px;
+      color: var(--gw-blue);
+      background: white;
+      overflow: hidden;
+    }
+
+    .tab-switch::before {
+      content: "";
+      position: absolute;
+      top: 3px;
+      bottom: 3px;
+      left: 3px;
+      width: calc(50% - 3px);
+      border-radius: 999px;
+      background: var(--gw-blue);
+      transition: transform 160ms ease;
+    }
+
+    .tab-switch.settings::before {
+      transform: translateX(100%);
+    }
+
+    .tab-switch span {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .tab-switch:not(.settings) span:first-child,
+    .tab-switch.settings span:last-child {
+      color: white;
+    }
+
+    button,
+    input[type="number"] {
+      min-height: 40px;
+      border: 2px solid var(--gw-blue);
+      border-radius: 10px;
+      color: var(--gw-blue);
+      background: white;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    button {
+      padding: 7px 14px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      color: white;
+      background: var(--gw-blue);
+    }
+
+    button:disabled,
+    input:disabled,
+    label.disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    input[type="number"] {
+      width: 86px;
+      padding: 4px 8px;
+    }
+
+    label {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      min-height: 36px;
+      font-weight: 650;
+    }
+
+    input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      accent-color: var(--gw-blue);
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .gamebar {
+      justify-content: center;
+      margin: 10px auto 0;
+      width: min(94vw, 680px);
+    }
+
+    .status-row {
+      justify-content: center;
+      min-height: 31px;
+      margin: 8px 0 0;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    #message.invalid {
+      color: var(--danger);
+    }
+
+    #message.win {
+      color: var(--gw-blue);
+    }
+
+    .board-wrap {
+      position: relative;
+      width: min(94vw, 72dvh, 680px);
+      max-width: 100%;
+      margin: 0 auto;
+      aspect-ratio: 1 / 1;
+      border: 3px solid var(--gw-blue);
+      border-radius: 12px;
+      overflow: hidden;
+      background: white;
+      touch-action: manipulation;
+    }
+
+    .board-wrap.inactive {
+      opacity: 0.55;
+    }
+
+    #board {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      width: 100%;
+      height: 100%;
+    }
+
+    .cell {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-width: 0;
+      min-height: 0;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border: 0;
+      border-right: 1px solid rgba(3, 60, 90, 0.42);
+      border-bottom: 1px solid rgba(3, 60, 90, 0.42);
+      border-radius: 0;
+      background: white;
+      appearance: none;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .cell.move {
+      background: var(--move-fill);
+      box-shadow: inset 0 0 0 2px var(--dark-buff);
+    }
+
+    .cell.safe::after {
+      content: "";
+      position: absolute;
+      inset: max(2px, 9%);
+      border: max(3px, 0.18em) solid var(--gw-blue);
+      border-radius: 999px;
+      background: var(--safe-fill);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .cell.win-square::before {
+      content: "";
+      position: absolute;
+      inset: 20%;
+      border-radius: 999px;
+      background: var(--gw-buff);
+      opacity: 0.95;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .cell.invalid-flash {
+      background: #F7B4AD;
+      box-shadow: inset 0 0 0 4px var(--danger);
+    }
+
+    .queen {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gw-blue);
+      font-size: var(--queen-size, 32px);
+      line-height: 1;
+      text-shadow: 0 1px 0 white;
+      transform: translateY(-2%);
+      pointer-events: none;
+    }
+
+    #lineOverlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    #lineOverlay line {
+      stroke: var(--dark-buff);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 8 7;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .settings-grid {
+      align-items: flex-start;
+      flex-direction: column;
+      padding: 6px 2px;
+    }
+
+    .settings-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .checks {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    .start-row {
+      margin-top: 8px;
+    }
+
+    .vars {
+      width: min(94vw, 680px);
+      margin: 7px auto 0;
+      padding: 8px 10px;
+      border: 2px solid var(--gw-buff);
+      border-radius: 10px;
+      background: white;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .vars:empty {
+      display: none;
+    }
+
+    @media (max-width: 440px) {
+      main {
+        padding: 9px;
+      }
+
+      button,
+      input[type="number"] {
+        min-height: 38px;
+      }
+
+      .board-wrap {
+        width: min(96vw, 68dvh);
+      }
+
+      .gamebar button {
+        flex: 1 1 120px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topbar">
+      <button id="tabSwitch" class="tab-switch" type="button" aria-label="Switch between Game and Settings" aria-pressed="false">
+        <span>Game</span>
+        <span>Settings</span>
+      </button>
+    </div>
+
+    <section id="gamePanel" class="panel active" aria-label="Game">
+      <div id="boardWrap" class="board-wrap inactive">
+        <div id="board" aria-label="Cornering Queen board"></div>
+        <svg id="lineOverlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </div>
+      <div class="gamebar">
+        <button id="undoBtn" type="button">Undo</button>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+      <div class="status-row"><span id="message"></span></div>
+      <div id="variables" class="vars" aria-live="polite"></div>
+    </section>
+
+    <section id="settingsPanel" class="panel" aria-label="Settings">
+      <div class="settings-grid">
+        <div class="settings-row">
+          <label for="sizeInput">N</label>
+          <input id="sizeInput" type="number" min="2" max="40" step="1" value="12" inputmode="numeric">
+        </div>
+        <div class="checks">
+          <label><input id="randomStart" type="checkbox" checked> Random start</label>
+          <label><input id="showMoves" type="checkbox" checked> Show moves</label>
+          <label><input id="showSafe" type="checkbox"> Show safe spots</label>
+          <label><input id="showLines" type="checkbox"> Show lines</label>
+          <label><input id="showVars" type="checkbox"> Show variables</label>
+        </div>
+        <div class="start-row">
+          <button id="startStopBtn" class="primary" type="button">Start</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const PHI = (1 + Math.sqrt(5)) / 2;
+      const PHI2 = PHI * PHI;
+      const FLASH_MS = 900;
+
+      const els = {
+        tabSwitch: document.getElementById('tabSwitch'),
+        gamePanel: document.getElementById('gamePanel'),
+        settingsPanel: document.getElementById('settingsPanel'),
+        boardWrap: document.getElementById('boardWrap'),
+        board: document.getElementById('board'),
+        lineOverlay: document.getElementById('lineOverlay'),
+        message: document.getElementById('message'),
+        variables: document.getElementById('variables'),
+        undoBtn: document.getElementById('undoBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        sizeInput: document.getElementById('sizeInput'),
+        randomStart: document.getElementById('randomStart'),
+        showMoves: document.getElementById('showMoves'),
+        showSafe: document.getElementById('showSafe'),
+        showLines: document.getElementById('showLines'),
+        showVars: document.getElementById('showVars'),
+        startStopBtn: document.getElementById('startStopBtn')
+      };
+
+      const state = {
+        activeTab: 'game',
+        started: false,
+        gameOver: false,
+        n: 12,
+        queen: null,
+        startQueen: null,
+        history: [],
+        flashTimer: null,
+        flashCell: null,
+        safeSpots: new Set()
+      };
+
+      function clampBoardSize(value) {
+        const n = Number.parseInt(value, 10);
+        if (!Number.isFinite(n)) return 12;
+        return Math.max(2, Math.min(40, n));
+      }
+
+      function key(x, y) {
+        return `${x},${y}`;
+      }
+
+      function samePos(a, b) {
+        return !!a && !!b && a.x === b.x && a.y === b.y;
+      }
+
+      function clonePos(pos) {
+        return pos ? { x: pos.x, y: pos.y } : null;
+      }
+
+      function setTab(tab) {
+        state.activeTab = tab;
+        const game = tab === 'game';
+        els.gamePanel.classList.toggle('active', game);
+        els.settingsPanel.classList.toggle('active', !game);
+        els.tabSwitch.classList.toggle('settings', !game);
+        els.tabSwitch.setAttribute('aria-pressed', String(!game));
+      }
+
+      function setMessage(text, className = '') {
+        els.message.textContent = text;
+        els.message.className = className;
+      }
+
+      function clearFlash() {
+        if (state.flashTimer) {
+          window.clearTimeout(state.flashTimer);
+          state.flashTimer = null;
+        }
+        if (state.flashCell) {
+          state.flashCell.classList.remove('invalid-flash');
+          state.flashCell = null;
+        }
+      }
+
+      function flashInvalid(cell) {
+        clearFlash();
+        if (cell) {
+          cell.classList.add('invalid-flash');
+          state.flashCell = cell;
+        }
+        setMessage('Invalid Move', 'invalid');
+        state.flashTimer = window.setTimeout(() => {
+          clearFlash();
+          if (!state.gameOver) setMessage('');
+        }, FLASH_MS);
+      }
+
+      function generateSafeSpots(n) {
+        const spots = new Set([key(0, 0)]);
+        for (let i = 1; i < n; i += 1) {
+          const a = Math.floor(i * PHI);
+          const b = Math.floor(i * PHI2);
+          if (a <= n && b <= n) {
+            spots.add(key(a, b));
+            spots.add(key(b, a));
+          }
+          if (a >= n && b >= n) break;
+        }
+        return spots;
+      }
+
+      function isMoveTarget(x, y) {
+        if (!state.queen || state.gameOver) return false;
+        const dx = state.queen.x - x;
+        const dy = state.queen.y - y;
+        return (dx > 0 && dy === 0) ||
+          (dx === 0 && dy > 0) ||
+          (dx > 0 && dy > 0 && dx === dy);
+      }
+
+      function isValidMove(target) {
+        if (!state.queen) return true;
+        return isMoveTarget(target.x, target.y);
+      }
+
+      function makeRandomStart(n) {
+        let pos;
+        do {
+          pos = {
+            x: Math.floor(Math.random() * n),
+            y: Math.floor(Math.random() * n)
+          };
+        } while (pos.x === pos.y);
+        return pos;
+      }
+
+      function lineEndForSlope(m) {
+        let x = state.n;
+        let y = m * x;
+        if (y > state.n) {
+          y = state.n;
+          x = y / m;
+        }
+        return { x: (x / state.n) * 100, y: 100 - (y / state.n) * 100 };
+      }
+
+      function renderLines() {
+        els.lineOverlay.innerHTML = '';
+        if (!state.started || !els.showLines.checked) return;
+        [PHI, 1 / PHI].forEach((m) => {
+          const end = lineEndForSlope(m);
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          line.setAttribute('x1', '0');
+          line.setAttribute('y1', '100');
+          line.setAttribute('x2', String(end.x));
+          line.setAttribute('y2', String(end.y));
+          els.lineOverlay.appendChild(line);
+        });
+      }
+
+      function renderVariables() {
+        if (!els.showVars.checked || !state.started || !state.queen) {
+          els.variables.textContent = '';
+          return;
+        }
+        const { x, y } = state.queen;
+        const small = Math.min(x, y);
+        const direction = x < y ? 'x < y' : y < x ? 'y < x' : 'x = y';
+        const n1 = Math.abs(y - x);
+        const c1 = Math.floor(n1 * PHI);
+        const n2 = Math.ceil(small / PHI);
+        const c2 = Math.floor(n2 * PHI);
+        const c2Phi2 = Math.floor(n2 * PHI2);
+        const n3 = Math.ceil(small / PHI2);
+        const c3 = Math.floor(n3 * PHI);
+        els.variables.innerHTML = `(${x}, ${y}) &nbsp; ${direction}<br>` +
+          `n₁ = |y−x| = ${n1}, ⌊n₁φ⌋ = ${c1}<br>` +
+          `n₂ = ⌈min(x,y)/φ⌉ = ${n2}, ⌊n₂φ⌋ = ${c2}, ⌊n₂φ²⌋ = ${c2Phi2}<br>` +
+          `n₃ = ⌈min(x,y)/φ²⌉ = ${n3}, ⌊n₃φ⌋ = ${c3}`;
+      }
+
+      function updateBoardSizing() {
+        const boardPx = els.boardWrap.clientWidth || Math.min(window.innerWidth * 0.94, 680);
+        const queenPx = Math.max(10, Math.min(52, (boardPx / state.n) * 0.72));
+        els.board.style.setProperty('--queen-size', `${queenPx}px`);
+      }
+
+      function renderBoard() {
+        clearFlash();
+        updateBoardSizing();
+        els.board.innerHTML = '';
+        els.board.style.gridTemplateColumns = `repeat(${state.n}, minmax(0, 1fr))`;
+        els.board.style.gridTemplateRows = `repeat(${state.n}, minmax(0, 1fr))`;
+        els.boardWrap.classList.toggle('inactive', !state.started);
+
+        for (let row = 0; row < state.n; row += 1) {
+          const y = state.n - 1 - row;
+          for (let col = 0; col < state.n; col += 1) {
+            const x = col;
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.className = 'cell';
+            cell.dataset.x = String(x);
+            cell.dataset.y = String(y);
+            cell.setAttribute('aria-label', `Square ${x}, ${y}`);
+
+            if (x === 0 && y === 0) cell.classList.add('win-square');
+            if (els.showSafe.checked && state.safeSpots.has(key(x, y))) cell.classList.add('safe');
+            if (els.showMoves.checked && isMoveTarget(x, y)) cell.classList.add('move');
+            if (samePos(state.queen, { x, y })) {
+              const queen = document.createElement('span');
+              queen.className = 'queen';
+              queen.textContent = '♛';
+              cell.appendChild(queen);
+            }
+            cell.addEventListener('click', onCellClick);
+            els.board.appendChild(cell);
+          }
+        }
+        renderLines();
+        renderVariables();
+        updateButtons();
+      }
+
+      function updateSettingsEnabled() {
+        const disabled = state.started;
+        [els.sizeInput, els.randomStart, els.showMoves, els.showSafe, els.showLines, els.showVars]
+          .forEach((el) => { el.disabled = disabled; });
+        document.querySelectorAll('#settingsPanel label').forEach((label) => {
+          label.classList.toggle('disabled', disabled);
+        });
+      }
+
+      function updateButtons() {
+        els.startStopBtn.textContent = state.started ? 'Stop' : 'Start';
+        els.undoBtn.disabled = !state.started || state.history.length === 0;
+        els.resetBtn.disabled = !state.started;
+      }
+
+      function startGame() {
+        state.n = clampBoardSize(els.sizeInput.value);
+        els.sizeInput.value = String(state.n);
+        state.safeSpots = generateSafeSpots(state.n);
+        state.queen = els.randomStart.checked ? makeRandomStart(state.n) : null;
+        state.startQueen = clonePos(state.queen);
+        state.history = [];
+        state.started = true;
+        state.gameOver = false;
+        setMessage('');
+        updateSettingsEnabled();
+        setTab('game');
+        renderBoard();
+      }
+
+      function stopGame() {
+        state.started = false;
+        state.gameOver = false;
+        state.history = [];
+        state.queen = null;
+        state.startQueen = null;
+        setMessage('');
+        updateSettingsEnabled();
+        renderBoard();
+      }
+
+      function checkWin() {
+        state.gameOver = !!state.queen && state.queen.x === 0 && state.queen.y === 0;
+        setMessage(state.gameOver ? 'You Win!' : '', state.gameOver ? 'win' : '');
+      }
+
+      function moveQueen(target) {
+        state.history.push(clonePos(state.queen));
+        state.queen = target;
+        checkWin();
+        renderBoard();
+      }
+
+      function onCellClick(event) {
+        if (!state.started || state.gameOver) return;
+        const cell = event.currentTarget;
+        const target = {
+          x: Number.parseInt(cell.dataset.x, 10),
+          y: Number.parseInt(cell.dataset.y, 10)
+        };
+        if (!isValidMove(target)) {
+          flashInvalid(cell);
+          return;
+        }
+        moveQueen(target);
+      }
+
+      function undo() {
+        if (!state.started || state.history.length === 0) return;
+        state.queen = state.history.pop();
+        state.gameOver = false;
+        setMessage('');
+        renderBoard();
+      }
+
+      function reset() {
+        if (!state.started) return;
+        state.queen = clonePos(state.startQueen);
+        state.history = [];
+        state.gameOver = false;
+        setMessage('');
+        renderBoard();
+      }
+
+      els.tabSwitch.addEventListener('click', () => {
+        setTab(state.activeTab === 'game' ? 'settings' : 'game');
+      });
+
+      els.startStopBtn.addEventListener('click', () => {
+        if (state.started) stopGame();
+        else startGame();
+      });
+
+      els.undoBtn.addEventListener('click', undo);
+      els.resetBtn.addEventListener('click', reset);
+
+      [els.showMoves, els.showSafe, els.showLines, els.showVars].forEach((el) => {
+        el.addEventListener('change', renderBoard);
+      });
+
+      window.addEventListener('resize', renderBoard);
+
+      state.safeSpots = generateSafeSpots(state.n);
+      renderBoard();
+      updateSettingsEnabled();
+      updateButtons();
+    })();
+  </script>
+</body>
+</html>
